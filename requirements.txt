@@ -1,0 +1,13 @@
+torch==2.13.0
+transformers==5.15.1
+datasets==5.0.1
+accelerate==1.14.0
+pandas==2.3.3
+numpy>=1.26
+scikit-learn==1.8.0
+matplotlib==3.10.8
+seaborn==0.13.2
+streamlit==1.57.0
+fastapi==0.136.1
+uvicorn>=0.30
+pyyaml==6.0.3
