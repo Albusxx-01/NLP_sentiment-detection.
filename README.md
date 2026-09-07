@@ -45,6 +45,20 @@ We treat this as **binary text classification**. Each headline is tokenized with
 
 Reference: https://en.wikipedia.org/wiki/F-score
 
+## Results
+
+Fine-tuned DistilBERT (2 epochs, AdamW, linear warmup + decay) on 5,000 train / 1,000 val / 1,000 test headlines.
+
+| Metric | Value |
+|--------|-------|
+| Accuracy | **0.8770** |
+| Precision | 0.9000 |
+| Recall | 0.8337 |
+| **F1** | **0.8656** ✅ (target ≥ 0.85) |
+
+- Misclassified: 123 / 1000 (12.30%)
+- Artifacts: `reports/evaluation_metrics.json`, `reports/confusion_matrix.png`, `reports/error_analysis.csv`, checkpoint in `models/checkpoint/`
+
 ## Setup
 
 ```bash
@@ -56,10 +70,12 @@ pip install -r requirements.txt
 ## Usage
 
 - Prepare data: `python -m src.data.prepare`
-- Train: `python -u -m src.model.train`
+- Train (local CPU legacy; pref. use the Colab notebook): `python -u -m src.model.train`
+- Train on GPU: open `notebooks/sarcasm_finetune_colab.ipynb` in Google Colab
 - Evaluate: `python -m src.model.evaluate`
 - Run demo app: `streamlit run src/app/demo.py`
 - Run API: `uvicorn src.app.api:app --reload`
+- Run tests: `python -m pytest tests/ -q`
 
 ## Project Structure
 

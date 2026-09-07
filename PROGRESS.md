@@ -2,7 +2,7 @@
 
 > Live status + resume guide. All work happens inside `03-nlp-transformer/` only.
 
-Last updated: 2026-09-07 (Session 4 — Stage 3+4 DONE via Colab, serving app ready)
+Last updated: 2026-09-07 (Session 4 — all six stages DONE, commit+push pending)
 
 ---
 
@@ -40,16 +40,17 @@ a8de62b first commit
 | `feature/training` | ✅ merged | `500bea3` |
 | `feature/evaluation` | ✅ merged | `c7eaaea` |
 | `feature/serving` | 📝 code written, not committed | — |
-| `feature/finalize` | ⬜ not started | — |
+| `feature/finalize` | 📝 done, not committed | — |
 
 ### Uncommitted files (not yet on any branch)
 
 | File | Status | Stage |
 |------|--------|-------|
 | `PROGRESS.md` | modified (this update) | docs |
-| `src/app/demo.py` | new | Stage 5 — Serving (Streamlit) |
-| `src/app/api.py` | new | Stage 5 — Serving (FastAPI) |
-| `tests/test_app.py` | new | Stage 6 — Tests |
+| `src/app/demo.py` | new, verified | Stage 5 — Serving (Streamlit) |
+| `src/app/api.py` | new, verified | Stage 5 — Serving (FastAPI) |
+| `tests/test_app.py` | new, passing | Stage 5 — Serving tests |
+| `tests/test_model.py` | new, passing | Stage 6 — Model tests |
 
 ---
 
@@ -69,7 +70,7 @@ a8de62b first commit
 - transformers `5.15.1`, datasets `5.0.1`, accelerate `1.14.0`,
   pandas `2.3.3`, scikit-learn `1.8.0`, matplotlib `3.10.8`, seaborn `0.13.2`,
   streamlit `1.57.0`, fastapi `0.136.1`, pyyaml `6.0.3`, pytest `9.1.1`
-- Tests: 7 passed, 2 skipped (model-dependent, correctly gated with `skipif`)
+- Tests: 11 passed (6 data + 3 app + 2 model), none skipped
 
 ---
 
@@ -133,58 +134,61 @@ a8de62b first commit
 - **Fixed a bug in `evaluate.py`:** `test_df[trues != preds]` raised
   `KeyError: True` (Python lists compared inside a pandas `[]` indexer). Replaced
   with a numpy boolean mask: `mask = np.asarray(trues) != np.asarray(preds)`.
-- Tests: full suite **9 passed** (previously 7 passed / 2 skipped — the model-gated
-  app tests now run against the real checkpoint).
+- Tests: full suite **11 passed** (was 7 passed / 2 skipped before the checkpoint existed).
 
-### [~] Stage 5 — Serving (CODE WRITTEN, checkpoint ready)
+### [x] Stage 5 — Serving (DONE — verified)
 
-- `src/app/demo.py` — Streamlit demo:
-  - Text input for headline, configurable confidence threshold slider
-  - Loads fine-tuned checkpoint, displays Sarcastic / Not sarcastic with confidence
-  - Graceful error if no checkpoint found
-  - Command: `streamlit run src/app/demo.py`
-- `src/app/api.py` — FastAPI endpoint:
-  - `POST /predict` → `{label, label_name, confidence}` from headline
-  - `GET /health` → status check
-  - Lazy-loads model on first request; returns 503 if no checkpoint
-  - Command: `uvicorn src.app.api:app --reload`
-- Bundle: worth doing a live smoke test now (checkpoint exists) — run both apps.
+- `src/app/demo.py` — Streamlit demo (verified booting headless, serves on localhost)
+- `src/app/api.py` — FastAPI endpoint (verified via TestClient)
+  - `GET /health` → `{status: ok, checkpoint: checkpoint}`
+  - `POST /predict` → `{label, label_name, confidence}`
+  - Sample predictions: "Man shoots neighbor…" → sarcastic 0.9277; "Study finds
+    listening to music…" → sarcastic 0.8375; "Boeing says new plane…" → not_sarcastic 0.517
+- **Fixed a bug in both apps:** `classes` config keys are ints (`{0:.., 1:..}`), but code
+  used `names[str(label)]` → `KeyError: '1'`. Changed to `names[label]`.
+- All 3 `tests/test_app.py` pass (previously skipped without checkpoint).
+- Commands: `streamlit run src/app/demo.py`, `uvicorn src.app.api:app --reload`.
 
-### [ ] Stage 6 — Finalize (NOT STARTED)
+### [x] Stage 6 — Finalize (DONE — lint skipped by user choice)
 
-- `tests/test_app.py` **written** (36 lines):
-  - `test_demo_imports` — smoke test (skip if no checkpoint)
-  - `test_api_health_and_predict_shape` — validates routes exist (skip if no checkpoint)
-  - `test_api_schema_valid` — Pydantic models instantiate correctly (always runs)
-  - Current suite: **7 passed, 2 skipped** (skipped tests correctly wait for checkpoint)
-- Remaining: full test suite round-up, ruff/black, README wrap-up, `.gitignore` review
+- **Linting skipped** — user chose to skip ruff/black/flake8 (none installed, not added
+  to requirements.txt). No lint config added.
+- **Cleanup done:**
+  - Deleted stale diagnostics: `reports/diag*.py/.log`, `training_console.log`,
+    `training_full.log`, `tokenize_rerun.log`, `streamlit_boot.log`
+  - Deleted `models/checkpoint.zip` (1.5 GB, already extracted)
+  - `reports/` now holds only real artifacts: `evaluation_metrics.json`,
+    `confusion_matrix.png`, `error_analysis.csv`
+- **Tests hardened:** added `tests/test_model.py` (2 smoke tests):
+  - `test_model_loads_and_predicts` — loads the checkpoint, runs a forward pass on 2
+    headlines, asserts logits shape `(2, num_labels)`, probabilities in [0,1],
+    labels ∈ {0,1}
+  - `test_config_matches_checkpoint` — asserts checkpoint `model_type=distilbert` and
+    architecture `DistilBertForSequenceClassification`
+  - Full suite: **11 passed** (6 data + 3 app + 2 model), none skipped.
+- `config.yaml` `training.fp16: false` refers to the legacy local CPU path; Colab
+  training used fp16 on GPU (noted in the notebook). Left as-is.
+- Outstanding: commit + push the many pending files when the user authorizes.
 
 ---
 
 ## Where To Start (resume here)
 
-1. **Stage 3 & 4 are DONE** — checkpoint at `models/checkpoint/`, evaluation passed
-   (F1 0.8656 ≥ target 0.85). Metrics in `reports/evaluation_metrics.json`.
-2. **Next: finish Stage 5 (Serving).** Smoke-test both apps now that a checkpoint exists:
+1. **All six stages are DONE.** Model trained on Colab GPU (F1 0.8656, PASS),
+   evaluated, served (Streamlit + FastAPI verified), and finalized (cleanup done,
+   11 tests pass). Checkpoint at `models/checkpoint/`.
+2. **Remaining: commit + push (awaiting user authorization).**
+   - Stage 5 files: `src/app/demo.py`, `src/app/api.py`, `tests/test_app.py`
+   - `tests/test_model.py` (new)
+   - App bug fixes, PROGRESS/README updates, Colab notebook, cleaned `reports/`
+   - Personal docs (user-owned): `learning/`, `pre-build/format.md`,
+     `pre-build/prerequisites.md`
+3. **To run the live apps:**
    ```
-   streamlit run src/app/demo.py          # then open the browser URL
-   uvicorn src.app.api:app --reload       # then curl /health and POST /predict
+   streamlit run src/app/demo.py
+   uvicorn src.app.api:app --reload
    ```
-   Then commit:
-   ```
-   git checkout -b feature/serving
-   git add src/app/demo.py src/app/api.py
-   git commit -m "feat(app): add Streamlit demo and FastAPI prediction endpoint"
-   git add tests/test_app.py
-   git commit -m "test(app): add serving smoke tests"
-   git checkout main && git merge feature/serving --no-ff
-   ```
-3. **Stage 6 (Finalize):** ruff/black lint+format, README status table update, clean
-   up stale `reports/diag*` files, delete `models/checkpoint.zip` (1.5 GB), push all
-   branches/main to origin.
-4. **Also uncommitted:** `notebooks/sarcasm_finetune_colab.ipynb` (the Colab training
-   notebook), the `evaluate.py` bug fix, and this PROGRESS update — commit these
-   under a docs/fix commit (or fold into feature/serving).
+   Tests: `python -m pytest tests/ -q` (11 passed)
 
 ---
 
@@ -216,11 +220,11 @@ a8de62b first commit
 - Training: `src/model/train.py` (CPU — segfaults; use Colab notebook instead)
 - Colab training: `notebooks/sarcasm_finetune_colab.ipynb`
 - Evaluation: `src/model/evaluate.py` (committed, fixed)
-- Serving: `src/app/demo.py`, `src/app/api.py` (uncommitted)
-- Tests: `tests/test_data.py`, `tests/test_app.py` (test_app uncommitted)
+- Serving: `src/app/demo.py`, `src/app/api.py` (verified; not yet committed)
+- Tests: `tests/test_data.py`, `tests/test_app.py`, `tests/test_model.py`
+  (test_app + test_model not yet committed)
 - Checkpoint: `models/checkpoint/` (`config.json`, `model.safetensors`, tokenizer)
 - Metrics/plots: `reports/evaluation_metrics.json`, `reports/confusion_matrix.png`,
   `reports/error_analysis.csv`
 - Data: `data/raw/Sarcasm_Headlines_Dataset.json` (raw, 28.6k),
   `data/processed/dataset.parquet` (7k, split)
-- Diagnostics: `reports/diag*.py/.log` (segfault investigation; can delete after training works)
