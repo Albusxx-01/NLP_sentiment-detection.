@@ -115,7 +115,8 @@ def main() -> None:
 
     df = pd.read_parquet(ROOT / cfg["data"]["processed_path"])
     test_df = df[df["split"] == "test"].reset_index(drop=True)
-    errors = test_df[trues != preds].copy()
+    mask = np.asarray(trues) != np.asarray(preds)
+    errors = test_df.loc[mask].copy()
     errors["predicted"] = [preds[i] for i in errors.index]
     errors["actual"] = [trues[i] for i in errors.index]
     errors["prob_sarcastic"] = [probs[i] for i in errors.index]
