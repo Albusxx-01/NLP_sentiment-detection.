@@ -16,7 +16,7 @@ Last updated: 2026-09-12 (Session 5 DONE — combined retrain on Colab GPU, eval
 ### `main` history (top → oldest)
 
 ```
-{{MERGE}} Merge feature/session5-combined: combined corpus retrain + tests + docs
+d485d62 Merge feature/session5-combined: combined corpus retrain + tests + docs
 bda3f54 Merge feature/serving: Streamlit demo + FastAPI API
 |  ff835c5 feat(serving): add Streamlit demo and FastAPI prediction endpoint
 512b1d9 docs: mark all six stages DONE, add README results + Colab train/test notes
@@ -47,7 +47,7 @@ a8de62b first commit
 | `feature/evaluation` | ✅ merged | `c7eaaea` |
 | `feature/serving` | ✅ merged | `bda3f54` |
 | `feature/finalize` | 📝 done, not committed | — |
-| `feature/session5-combined` | ✅ merged | `{{MERGE}}` |
+| `feature/session5-combined` | ✅ merged | `d485d62` |
 
 ### Committed & pushed since last session
 
@@ -56,7 +56,7 @@ a8de62b first commit
 | `bda3f54` | Merge `feature/serving` → `main` (`--no-ff`). PUSHED. |
 | `ff835c5` | Serving: `src/app/demo.py`, `src/app/api.py`, `tests/test_app.py`. PUSHED. |
 | `512b1d9` | `PROGRESS.md` + `README.md` (docs: 6 stages DONE, README results + Colab/tests notes). PUSHED. |
-| `{{MERGE}}` | Merge `feature/session5-combined` → `main` (`--no-ff`). PUSHED. |
+| `d485d62` | Merge `feature/session5-combined` → `main` (`--no-ff`). PUSHED. |
 
 ### Uncommitted files (not yet on any branch)
 
