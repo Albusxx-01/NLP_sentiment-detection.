@@ -2,20 +2,26 @@
 
 > Live status + resume guide. All work happens inside `03-nlp-transformer/` only.
 
-Last updated: 2026-09-07 (Session 4 — all six stages DONE, commit+push pending)
+Last updated: 2026-09-12 (Session 5 DONE — combined retrain on Colab GPU, eval PASS, committed & pushed)
 
 ---
 
 ## Git — Branch & Commit Record
 
 - Repo: nested repo inside the project folder. Branch `main`, remote `origin/main` exists.
-  NOT pushed (ahead of origin by several commits).
+  PUSHED — in sync with origin/main (serving + prior docs committed).
 - Strategy: one feature branch per stage, merged into `main` with `--no-ff`.
 - `data/`, `models/`, `reports/` are gitignored — only `.gitkeep` is tracked.
 
 ### `main` history (top → oldest)
 
 ```
+{{MERGE}} Merge feature/session5-combined: combined corpus retrain + tests + docs
+bda3f54 Merge feature/serving: Streamlit demo + FastAPI API
+|  ff835c5 feat(serving): add Streamlit demo and FastAPI prediction endpoint
+512b1d9 docs: mark all six stages DONE, add README results + Colab train/test notes
+5c15b4b fix(eval): use numpy boolean mask for error analysis; docs: mark stages 3-4 done; add Colab training notebook
+b52809e docs: expand README with project write-up and references
 c7eaaea Merge feature/evaluation: metrics, confusion matrix, error analysis
 |  2d7479f feat(model): add evaluation with metrics and confusion matrix
 500bea3 Merge feature/training: fine-tuning script + progress tracker
@@ -39,18 +45,24 @@ a8de62b first commit
 | `feature/data-pipeline` | ✅ merged | `461b84b` |
 | `feature/training` | ✅ merged | `500bea3` |
 | `feature/evaluation` | ✅ merged | `c7eaaea` |
-| `feature/serving` | 📝 code written, not committed | — |
+| `feature/serving` | ✅ merged | `bda3f54` |
 | `feature/finalize` | 📝 done, not committed | — |
+| `feature/session5-combined` | ✅ merged | `{{MERGE}}` |
+
+### Committed & pushed since last session
+
+| Commit | Scope |
+|--------|-------|
+| `bda3f54` | Merge `feature/serving` → `main` (`--no-ff`). PUSHED. |
+| `ff835c5` | Serving: `src/app/demo.py`, `src/app/api.py`, `tests/test_app.py`. PUSHED. |
+| `512b1d9` | `PROGRESS.md` + `README.md` (docs: 6 stages DONE, README results + Colab/tests notes). PUSHED. |
+| `{{MERGE}}` | Merge `feature/session5-combined` → `main` (`--no-ff`). PUSHED. |
 
 ### Uncommitted files (not yet on any branch)
 
 | File | Status | Stage |
 |------|--------|-------|
-| `PROGRESS.md` | modified (this update) | docs |
-| `src/app/demo.py` | new, verified | Stage 5 — Serving (Streamlit) |
-| `src/app/api.py` | new, verified | Stage 5 — Serving (FastAPI) |
-| `tests/test_app.py` | new, passing | Stage 5 — Serving tests |
-| `tests/test_model.py` | new, passing | Stage 6 — Model tests |
+| `learning/`, `pre-build/format.md`, `pre-build/prerequisites.md` | untracked (user-owned) | personal docs — commit only if wanted |
 
 ---
 
@@ -70,7 +82,7 @@ a8de62b first commit
 - transformers `5.15.1`, datasets `5.0.1`, accelerate `1.14.0`,
   pandas `2.3.3`, scikit-learn `1.8.0`, matplotlib `3.10.8`, seaborn `0.13.2`,
   streamlit `1.57.0`, fastapi `0.136.1`, pyyaml `6.0.3`, pytest `9.1.1`
-- Tests: 11 passed (6 data + 3 app + 2 model), none skipped
+- Tests: 17 passed (6 data + 3 app + 2 model + 6 combined), none skipped
 
 ---
 
@@ -168,27 +180,81 @@ a8de62b first commit
   - Full suite: **11 passed** (6 data + 3 app + 2 model), none skipped.
 - `config.yaml` `training.fp16: false` refers to the legacy local CPU path; Colab
   training used fp16 on GPU (noted in the notebook). Left as-is.
-- Outstanding: commit + push the many pending files when the user authorizes.
+- Outstanding: serving (Stage 5) committed & pushed (`bda3f54`); commit + push remaining pending files (Stage 6 model tests + Session 5) when the user authorizes.
+
+### [x] Session 5 — Dataset expansion: combined multi-source corpus (DONE)
+
+**Goal:** improve detection of sarcasm (esp. reducing false negatives on the sarcastic
+class) by training on a larger, more varied corpus instead of headlines-only.
+
+**Research (done):**
+- Reviewed candidate datasets: iSarcasmEval, SARC Reddit, MUStARD, iSarcasm (dmbavkar),
+  Riloff/Twitter, MMSD/multimodal, and several HuggingFace mirrors.
+- **Rejected** `nikesh66/Sarcasm-dataset` (synthetic/template-augmented — would inject
+  artifact patterns) and `SarcasmNet/sarcasm` (token-classification, odd deps).
+- **Excluded iSarcasm (dmbavkar):** repo only publishes `tweet_id`s — the actual tweet
+  text is held privately by the authors (requires a data-sharing agreement), so it
+  cannot be fetched programmatically.
+
+**Combined dataset built** → `data/processed/combined.parquet` via `src/data/build_combined.py`
+(`python -m src.data.build_combined`; SARC loads via HF `datasets`):
+
+| Source | Rows | Sarcasm share |
+|--------|------|---------------|
+| `headlines_v2` (Sarcasm Headlines v2) | 28,503 | 47.5% |
+| `isarcasm` (iSarcasmEval SemEval-2022 T6, EN) | 3,456 | 25.1% |
+| `sarc_reddit` (SARC Reddit, English, capped 30k) | 29,530 | 50.2% |
+| `mu_stard` (MUStARD TV dialogue) | 673 | 51.0% |
+| **Total** | **62,162** | **47.6%** |
+
+- Unified schema: `text`, `label`, `source`, `split`.
+- Stratified 80/10/10 → **train 49,729 / val 6,216 / test 6,217**.
+- SARC source: `marcbishara/sarcasm-on-reddit` (HF, split `sft_train`), loads all 272k
+  rows then subsamples to `combined.sarc_cap=30000` (balanced ~50% sarc).
+- MUStARD cached at `data/raw/muSTARD_sarcasm_data.json` (GitHub, default branch `master`).
+- Local `data`/`dataset` config left on the headline-only pipeline (keeps `prepare.py`
+  + legacy tests intact); the combined path is driven by the `combined` config.
+
+**Retrain (DONE — Colab GPU):** Ran `notebooks/sarcasm_finetune_colab.ipynb` with all 4
+sources (49k/6k/6k train/val/test caps). Fixed a small notebook quirk: `dropna` now runs
+before `astype(str)` so an empty iSarcasmEval `tweet` cell (1) is dropped instead of
+becoming the literal string "nan".
+- Trained 2 epochs, 3064 steps, batch 32, fp16; best val F1 **0.7877** (epoch 2).
+- **Combined test (6,000 rows):** F1 **0.7775**, acc 0.797 (Colab `metrics.json`). Not
+  directly comparable to the headline test — heterogeneous corpus.
+- **Local headline test (1,000 rows) — apples-to-apples vs baseline:** F1 **0.9373**
+  (baseline 0.8656), acc **0.9390**, precision 0.9157, recall 0.9600; 61/1000 misclassified
+  (was 123). CM [[483,42],[19,456]]. Target F1 ≥ 0.85 → **PASS**.
+- New checkpoint replaced the old baseline in `models/checkpoint/`. Old model only existed
+  in stale `checkpoint-797`/`checkpoint-1594` dirs (deleted during cleanup); new model is
+  strictly better.
+- Cleanup: deleted `models/checkpoint.zip` (1.6 GB, already extracted).
+
+**Tests:** added `tests/test_combined.py` (6 tests) + `tests/test_model.py` (2 smoke
+tests, moved from Stage 6). Full suite now **17 passed** (6 data + 3 app + 2 model
++ 6 combined), none skipped.
+
+**Result:** combined corpus adopted. All pending Session-5 + Stage-6 code + docs committed
+& pushed via `feature/session5-combined` → `main`.
 
 ---
 
 ## Where To Start (resume here)
 
-1. **All six stages are DONE.** Model trained on Colab GPU (F1 0.8656, PASS),
-   evaluated, served (Streamlit + FastAPI verified), and finalized (cleanup done,
-   11 tests pass). Checkpoint at `models/checkpoint/`.
-2. **Remaining: commit + push (awaiting user authorization).**
-   - Stage 5 files: `src/app/demo.py`, `src/app/api.py`, `tests/test_app.py`
-   - `tests/test_model.py` (new)
-   - App bug fixes, PROGRESS/README updates, Colab notebook, cleaned `reports/`
-   - Personal docs (user-owned): `learning/`, `pre-build/format.md`,
-     `pre-build/prerequisites.md`
+1. **All six stages are DONE** and **Session 5 (combined corpus) is DONE.**
+   - Combined 4-source corpus (**62,162 rows**) built at `data/processed/combined.parquet`;
+     `build_combined.py` + Colab notebook updated. 17 tests pass.
+   - The **combined model is live** at `models/checkpoint/` (retrained on Colab GPU).
+     Headline-test F1 improved **0.8656 → 0.9373**; combined-test F1 0.7775.
+     Baseline checkpoint deleted (new model is strictly better).
+2. **Nothing pending.** Code + docs committed & pushed. Only untracked files left are
+   personal docs (user-owned): `learning/`, `pre-build/format.md`, `pre-build/prerequisites.md`.
 3. **To run the live apps:**
    ```
    streamlit run src/app/demo.py
    uvicorn src.app.api:app --reload
    ```
-   Tests: `python -m pytest tests/ -q` (11 passed)
+   Tests: `python -m pytest tests/ -q` (17 passed)
 
 ---
 
@@ -198,6 +264,7 @@ a8de62b first commit
 |------|---------|
 | Prepare data | `python -m src.data.prepare` |
 | Tokenize (verify loaders) | `python -m src.data.tokenize` |
+| Build combined corpus | `python -m src.data.build_combined` |
 | Train | `PYTHONUNBUFFERED=1 python -u -m src.model.train 2>&1 > reports/training_run.log` |
 | Evaluate | `python -m src.model.evaluate` |
 | Tests | `python -m pytest tests/ -q` |
@@ -220,11 +287,14 @@ a8de62b first commit
 - Training: `src/model/train.py` (CPU — segfaults; use Colab notebook instead)
 - Colab training: `notebooks/sarcasm_finetune_colab.ipynb`
 - Evaluation: `src/model/evaluate.py` (committed, fixed)
-- Serving: `src/app/demo.py`, `src/app/api.py` (verified; not yet committed)
-- Tests: `tests/test_data.py`, `tests/test_app.py`, `tests/test_model.py`
-  (test_app + test_model not yet committed)
+- Serving: `src/app/demo.py`, `src/app/api.py` (verified; committed, pushed)
+- Tests: `tests/test_data.py`, `tests/test_app.py` (committed); `tests/test_model.py`,
+  `tests/test_combined.py` (not yet committed)
 - Checkpoint: `models/checkpoint/` (`config.json`, `model.safetensors`, tokenizer)
 - Metrics/plots: `reports/evaluation_metrics.json`, `reports/confusion_matrix.png`,
   `reports/error_analysis.csv`
-- Data: `data/raw/Sarcasm_Headlines_Dataset.json` (raw, 28.6k),
+- Data (headline-only pipeline): `data/raw/Sarcasm_Headlines_Dataset.json` (raw, 28.6k),
   `data/processed/dataset.parquet` (7k, split)
+- Data (combined corpus, Session 5): `src/data/build_combined.py`,
+  `config.yaml` (`combined.*`), `data/processed/combined.parquet` (62k, 4 sources),
+  `data/raw/iSarcasmEval_train.En.csv`, `data/raw/muSTARD_sarcasm_data.json`
